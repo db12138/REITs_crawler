@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 import requests
 import ujson
+import os
 from tqdm import tqdm
 import time, base64
 
@@ -21,9 +22,10 @@ def get_driver():
 
 def get_files_infos_in_cur_page(page_num,driver):
     cmd = f"javascript:showReitsAs({page_num});"
-    driver.execute_script(cmd)
-    print("sleeping 8s")
-    time.sleep(8)
+    for i in range(5):
+        driver.execute_script(cmd)
+        print("sleeping 2s")
+        time.sleep(2)
     trs = driver.find_elements(By.TAG_NAME,'tr')
     all_file_infos = []
     for each_file_info in trs:
@@ -52,6 +54,46 @@ def read_json():
     files_info = ujson.load(open("上交所REITs信息.json",'r'))
     ujson.dump(files_info,open("上交所REITs信息_2.json",'w'),ensure_ascii=False)
     # print(files_info)
+def download_from_url(cur_url,file_name,dir_path):
+    response = requests.get(cur_url)
+    # Save the PDF
+    if response.status_code == 200:
+        with open( os.path.join(dir_path,file_name), "wb") as f:
+            f.write(response.content)
+    else:
+        print(response.status_code)
+def download_all_files(all_file_name="上交所REITs信息_2.json"):
+    files_info = ujson.load(open(all_file_name,'r'))
+    page_num = len(files_info)
+    for i in tqdm(range(page_num)):
+        cur_page_info = files_info[i]
+        # print(cur_page_info[0].keys()) #['code', 'file_name', 'file_href', 'release_date'])
+        for each_file in tqdm(cur_page_info):
+            save_file_name = f"发布日_{each_file['release_date']}_{each_file['file_name']}.pdf"
+            download_from_url(each_file["file_href"],save_file_name,"上交所公告")
+            
+            # print(each_file["file_href"])
+def check_if_dumped(all_file_name="上交所REITs信息_2.json"):
+    files_info = ujson.load(open(all_file_name,'r'))
+    page_num = len(files_info)
+
+    name_pagenum_map = {}
+
+    for i in tqdm(range(page_num)):
+        cur_page_info = files_info[i]
+        # print(cur_page_info[0].keys()) #['code', 'file_name', 'file_href', 'release_date'])
+        for each_file in tqdm(cur_page_info):
+            save_file_name = f"发布日_{each_file['release_date']}_{each_file['file_name']}.pdf"
+            if save_file_name not in name_pagenum_map:
+                name_pagenum_map[save_file_name] = i 
+            else:
+                print(f"{save_file_name}  already in front page, cur page:{i} miss")
+    page_set = []
+    for name,page in name_pagenum_map.items():
+        if page not in page_set:
+            page_set.append(page)
+    print(page_set)
+
 if __name__ == "__main__":
     # driver = get_driver()
     # all_result = []
@@ -59,5 +101,6 @@ if __name__ == "__main__":
     #     page_info = get_files_infos_in_cur_page(page_num,driver)
     #     all_result.append(page_info)
 
-    # ujson.dump(all_result,open("上交所REITs信息.json",'w'))
-    read_json()
+    # ujson.dump(all_result,open("上交所REITs信息_3.json",'w'),ensure_ascii=False)
+    #check_if_dumped("上交所REITs信息_3.json")
+    download_all_files()
