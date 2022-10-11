@@ -35,13 +35,20 @@ def set_search_time(driver):
 
 
 def get_files_infos_in_cur_page(page_num,driver):
-    # cmd = f"javascript:showReitsAs({page_num});"
-    # driver.execute_script(cmd)
-    # print("sleeping 8s")
-    # time.sleep(8)
-    trs = driver.find_elements(By.TAG_NAME,'tr')
+    try:
+        page_buttons = driver.find_element(By.XPATH,f"//a[@data-pi={page_num-1}]")   
+        page_buttons.click()
+        sleeping(4,"page change")
+        print(f"转到第{page_num}页")
+    except Exception as e:
+        print(f"error:{e}, no such page {page_num}")
+        assert 0
+
+
     all_file_infos = []
-    for each_file_info in trs:
+    trs = driver.find_elements(By.TAG_NAME,'tr')
+    
+    for each_file_info in tqdm(trs):
         try:
             cur_tds = each_file_info.find_elements(By.TAG_NAME,'td')
             print(len(cur_tds))
@@ -60,8 +67,8 @@ def get_files_infos_in_cur_page(page_num,driver):
             print(date_info.text)
             assert 0
             cur_file_info["code"] = code_info.text
-            cur_file_info["file_name"] = file_info.get_attribute('text')
-            cur_file_info["file_href"] = file_info.get_attribute('href')
+            cur_file_info["file_name"] = file_name
+            # cur_file_info["file_href"] = file_info.get_attribute('href')
             cur_file_info["release_date"] = date_info.text
             print(cur_file_info)
             all_file_infos.append(cur_file_info)
@@ -72,15 +79,43 @@ def get_files_infos_in_cur_page(page_num,driver):
     return all_file_infos
 
 def read_json():
-    files_info = ujson.load(open("上交所REITs信息.json",'r'))
-    ujson.dump(files_info,open("上交所REITs信息_2.json",'w'),ensure_ascii=False)
+    files_info = ujson.load(open("深交所REITs信息.json",'r'))
+    ujson.dump(files_info,open("深交所REITs信息_2.json",'w'),ensure_ascii=False)
     # print(files_info)
+
+def check_if_dumped(all_file_name="深交所REITs信息.json"):
+    files_info = ujson.load(open(all_file_name,'r'))
+    page_num = len(files_info)
+
+    name_pagenum_map = {}
+
+    for i in tqdm(range(page_num)):
+        cur_page_info = files_info[i]
+        # print(cur_page_info[0].keys()) #['code', 'file_name', 'file_href', 'release_date'])
+        for each_file in tqdm(cur_page_info):
+            save_file_name = f"发布日_{each_file['release_date']}_{each_file['file_name']}.pdf"
+            if save_file_name not in name_pagenum_map:
+                name_pagenum_map[save_file_name] = i 
+            else:
+                print(f"{save_file_name}  already in front page, cur page:{i} miss")
+    page_set = []
+    for name,page in name_pagenum_map.items():
+        if page not in page_set:
+            page_set.append(page)
+    print(page_set)
+
 if __name__ == "__main__":
     driver = get_driver()
     set_search_time(driver)
-    get_files_infos_in_cur_page(1,driver)
+    all_result = []
+    for page_num in tqdm(range(1,7)):
+        page_info = get_files_infos_in_cur_page(page_num,driver)
+        all_result.append(page_info)
 
-    sleeping(100000)
+    save_download_history_name = "深交所REITs信息.json"
+    ujson.dump(all_result,open(save_download_history_name,'w'),ensure_ascii=False)
+    check_if_dumped(save_download_history_name)
+    sleeping(100)
     # all_result = []
     # for page_num in tqdm(range(1,16)):
     #     page_info = get_files_infos_in_cur_page(page_num,driver)

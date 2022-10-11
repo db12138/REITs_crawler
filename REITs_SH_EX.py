@@ -54,7 +54,10 @@ def read_json():
     files_info = ujson.load(open("上交所REITs信息.json",'r'))
     ujson.dump(files_info,open("上交所REITs信息_2.json",'w'),ensure_ascii=False)
     # print(files_info)
-def download_from_url(cur_url,file_name,dir_path):
+def download_from_url(cur_url,file_name,dir_path,already_downloaded_files):    
+    if file_name in already_downloaded_files:
+        print(f"在已经下载的 {len(already_downloaded_files)} 中")
+        return
     response = requests.get(cur_url)
     # Save the PDF
     if response.status_code == 200:
@@ -62,7 +65,11 @@ def download_from_url(cur_url,file_name,dir_path):
             f.write(response.content)
     else:
         print(response.status_code)
-def download_all_files(all_file_name="上交所REITs信息_2.json"):
+def download_all_files(all_file_name="上交所REITs信息_3.json",dir_path="上交所公告"):
+    already_downloaded_files = []
+    for _,_,filenames in os.walk(dir_path):
+        already_downloaded_files.extend(filenames)
+
     files_info = ujson.load(open(all_file_name,'r'))
     page_num = len(files_info)
     for i in tqdm(range(page_num)):
@@ -70,17 +77,25 @@ def download_all_files(all_file_name="上交所REITs信息_2.json"):
         # print(cur_page_info[0].keys()) #['code', 'file_name', 'file_href', 'release_date'])
         for each_file in tqdm(cur_page_info):
             save_file_name = f"发布日_{each_file['release_date']}_{each_file['file_name']}.pdf"
-            download_from_url(each_file["file_href"],save_file_name,"上交所公告")
-            
+            download_from_url(each_file["file_href"],save_file_name,dir_path,already_downloaded_files)        
             # print(each_file["file_href"])
-def check_if_dumped(all_file_name="上交所REITs信息_2.json"):
+def test_glob():
+    cnt = 0
+    all_download_files = []
+    for dir_path,dir_names,filenames in os.walk("./上交所公告/"):
+        cnt+= 1
+        print(filenames)
+    print(cnt)
+
+def check_if_dumped(all_file_name="上交所REITs信息_3.json"):
     files_info = ujson.load(open(all_file_name,'r'))
     page_num = len(files_info)
 
     name_pagenum_map = {}
-
+    cnt = 0
     for i in tqdm(range(page_num)):
         cur_page_info = files_info[i]
+        cnt += len(cur_page_info)
         # print(cur_page_info[0].keys()) #['code', 'file_name', 'file_href', 'release_date'])
         for each_file in tqdm(cur_page_info):
             save_file_name = f"发布日_{each_file['release_date']}_{each_file['file_name']}.pdf"
@@ -93,6 +108,7 @@ def check_if_dumped(all_file_name="上交所REITs信息_2.json"):
         if page not in page_set:
             page_set.append(page)
     print(page_set)
+    print(f"all_file nums :{cnt}")
 
 if __name__ == "__main__":
     # driver = get_driver()
@@ -103,4 +119,5 @@ if __name__ == "__main__":
 
     # ujson.dump(all_result,open("上交所REITs信息_3.json",'w'),ensure_ascii=False)
     #check_if_dumped("上交所REITs信息_3.json")
-    download_all_files()
+    #test_glob()
+    download_all_files("上交所REITs信息_3.json")
